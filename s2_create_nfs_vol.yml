@@ -1,0 +1,66 @@
+#!/usr/bin/env ansible-playbook
+
+################################################################################
+#
+# Title:        33_create_nfsvol_pri_svm.py
+# Author:       Vish Hulika
+# Date:         2020-06-21
+# Description:  Create volume on primary SVM
+#               with Ansible modules
+#
+# Modules:      na_ontap_volume
+#
+# URLs:         http://docs.netapp.com/ontap-9/index.jsp
+#               https://galaxy.ansible.com/netapp/ontap
+#
+# Built-in help:
+# ansible-doc netapp.ontap.na_ontap_volume
+#
+################################################################################
+
+- hosts: localhost
+  gather_facts: false
+  vars:
+    input: &input
+      hostname:       "{{ PRI_CLU }}"
+      username:       "{{ PRI_CLU_USER }}"
+      password:       "{{ PRI_CLU_PASS }}"
+      https:          true
+      validate_certs: false
+      # use_rest:       Always
+  vars_files:
+    - global_nas.vars
+  collections:
+    - netapp.ontap
+
+  tasks:
+  - name: Change Volume
+    na_ontap_volume:
+      state:           present
+      name:            "{{ PRI_SVM }}_nfs_01"     
+      vserver:         "{{ PRI_SVM }}"
+      junction_path:   "/{{ PRI_SVM }}_nfs_01"
+      policy:          default123
+      <<: *input
+  - name: Create a Qtree
+    na_ontap_qtree:
+      state:           present
+      name:            nfs_01
+      vserver:         "{{ PRI_SVM }}"
+      flexvol_name:    "{{ PRI_SVM }}_nfs_01"
+      security_style:  unix
+      <<: *input
+  - name: Create an Export Policy
+    na_ontap_export_policy_rule:
+      state:               present
+      name:                default123
+      vserver:             "{{ PRI_SVM }}"
+      client_match:        0.0.0.0/0
+      ro_rule:             any
+      rw_rule:             any
+      protocol:            nfs3
+      super_user_security: any
+      anonymous_user_id:   65534
+      allow_suid:          true
+      <<: *input
+
